@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swiftbits"
+version = "0.1.0"
+description = "Vectorize local documents and serve them as a local MCP server for Claude Desktop"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Zechariah Early" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Indexing",
+]
+dependencies = [
+    "click>=8.0",
+    "pymupdf>=1.24",
+    "sentence-transformers>=2.2",
+    "openai>=1.0",
+    "chromadb>=0.4",
+    "mcp>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+swiftbits = "swiftbits.cli:cli"
+
+[project.urls]
+Homepage = "https://github.com/zech-early/swiftbits"
+Repository = "https://github.com/zech-early/swiftbits"
+Issues = "https://github.com/zech-early/swiftbits/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
