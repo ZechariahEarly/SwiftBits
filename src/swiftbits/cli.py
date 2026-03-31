@@ -11,7 +11,12 @@ from swiftbits.config import (
     DEFAULT_CHUNK_OVERLAP,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_COLLECTION,
+    VALID_CONFIG_KEYS,
+    VALID_PROVIDERS,
     ensure_data_dirs,
+    get_config_value,
+    load_config,
+    set_config_value,
 )
 from swiftbits.embeddings import get_provider
 from swiftbits.processor import PARSERS, process_document
@@ -32,7 +37,7 @@ def cli(ctx, verbose):
 @cli.command()
 @click.argument("file_path", type=click.Path())
 @click.option("--collection", default=DEFAULT_COLLECTION, help="Collection name")
-@click.option("--provider", default="local", type=click.Choice(["local", "openai", "voyage"]), help="Embedding provider")
+@click.option("--provider", default=None, type=click.Choice(["local", "openai", "voyage"]), help="Embedding provider (default: from config or 'local')")
 @click.option("--api-key", default=None, help="API key for remote provider")
 @click.option("--chunk-size", default=DEFAULT_CHUNK_SIZE, type=int, help="Target chunk size")
 @click.option("--chunk-overlap", default=DEFAULT_CHUNK_OVERLAP, type=int, help="Overlap between chunks")
@@ -40,6 +45,14 @@ def cli(ctx, verbose):
 def vector(ctx, file_path, collection, provider, api_key, chunk_size, chunk_overlap):
     """Vectorize a document and store it in the collection."""
     verbose = ctx.obj.get("verbose", False)
+
+    # Resolve provider from config if not explicitly passed
+    cfg = load_config()
+    if provider is None:
+        provider = cfg.get("default_provider", "local")
+        if provider not in VALID_PROVIDERS:
+            click.secho(f"Error: Invalid default provider in config: {provider}", fg="red", err=True)
+            raise SystemExit(1)
 
     # Validate file exists
     if not os.path.exists(file_path):
@@ -56,10 +69,12 @@ def vector(ctx, file_path, collection, provider, api_key, chunk_size, chunk_over
     # Resolve API key for OpenAI
     if provider == "openai":
         if not api_key:
+            api_key = cfg.get("api_keys", {}).get("openai")
+        if not api_key:
             api_key = os.environ.get("SWIFTBITS_OPENAI_KEY")
         if not api_key:
             click.secho(
-                "Error: OpenAI API key required. Set SWIFTBITS_OPENAI_KEY or use --api-key",
+                "Error: OpenAI API key required. Use --api-key, swiftbits config set api_keys.openai, or set SWIFTBITS_OPENAI_KEY",
                 fg="red",
                 err=True,
             )
@@ -68,10 +83,12 @@ def vector(ctx, file_path, collection, provider, api_key, chunk_size, chunk_over
     # Resolve API key for Voyage
     if provider == "voyage":
         if not api_key:
+            api_key = cfg.get("api_keys", {}).get("voyage")
+        if not api_key:
             api_key = os.environ.get("SWIFTBITS_VOYAGE_KEY")
         if not api_key:
             click.secho(
-                "Error: Voyage AI API key required. Set SWIFTBITS_VOYAGE_KEY or use --api-key",
+                "Error: Voyage AI API key required. Use --api-key, swiftbits config set api_keys.voyage, or set SWIFTBITS_VOYAGE_KEY",
                 fg="red",
                 err=True,
             )
@@ -205,3 +222,65 @@ def remove(ctx, identifier, collection, remove_all):
         click.secho("✓ ", fg="green", nl=False)
         click.echo(f"Removed {identifier} from collection '{collection}'")
         click.echo(f"  Removed {removed} chunks")
+
+
+def _mask_key(value: str) -> str:
+    """Mask an API key for display, showing first 4 and last 4 characters."""
+    if len(value) <= 12:
+        return value[:4] + "..." + value[-4:] if len(value) > 8 else "****"
+    return value[:4] + "..." + value[-4:]
+
+
+@cli.group()
+def config():
+    """Manage SwiftBits configuration."""
+    pass
+
+
+@config.command("set")
+@click.argument("key")
+@click.argument("value")
+def config_set(key, value):
+    """Set a configuration value (e.g. default_provider, api_keys.openai)."""
+    try:
+        set_config_value(key, value)
+    except ValueError as e:
+        click.secho(f"Error: {e}", fg="red", err=True)
+        raise SystemExit(1)
+
+    display = _mask_key(value) if key.startswith("api_keys.") else value
+    click.secho("✓ ", fg="green", nl=False)
+    click.echo(f"Set {key} = {display}")
+
+
+@config.command("get")
+@click.argument("key")
+def config_get(key):
+    """Get a configuration value."""
+    if key not in VALID_CONFIG_KEYS:
+        valid = ", ".join(sorted(VALID_CONFIG_KEYS))
+        click.secho(f"Error: Unknown config key: {key} (valid keys: {valid})", fg="red", err=True)
+        raise SystemExit(1)
+
+    value = get_config_value(key)
+    if value is None:
+        click.echo(f"{key}: (not set)")
+    else:
+        display = _mask_key(value) if key.startswith("api_keys.") else value
+        click.echo(f"{key}: {display}")
+
+
+@config.command("show")
+def config_show():
+    """Show all configuration settings."""
+    cfg = load_config()
+    if not cfg:
+        click.echo("No configuration set. Use 'swiftbits config set <key> <value>' to configure.")
+        return
+
+    if "default_provider" in cfg:
+        click.echo(f"  default_provider: {cfg['default_provider']}")
+
+    api_keys = cfg.get("api_keys", {})
+    for provider_name, key_value in api_keys.items():
+        click.echo(f"  api_keys.{provider_name}: {_mask_key(key_value)}")

@@ -38,9 +38,37 @@ swiftbits remove document.pdf
 swiftbits remove myc --all
 ```
 
+### Configuration
+
+Set a default provider and API key so you don't need flags every time:
+
+```bash
+# Set a default embedding provider
+swiftbits config set default_provider openai
+
+# Store an API key (saved in ~/.swiftbits/config.json)
+swiftbits config set api_keys.openai sk-...
+
+# Now just run — no flags needed
+swiftbits vector document.pdf
+
+# View current config
+swiftbits config show
+
+# CLI flags always override config
+swiftbits vector document.pdf --provider local
+```
+
+Note: API keys are stored in plaintext in `~/.swiftbits/config.json`.
+
 ### Using OpenAI Embeddings
 
 ```bash
+# Via config (recommended)
+swiftbits config set default_provider openai
+swiftbits config set api_keys.openai sk-...
+swiftbits vector document.pdf
+
 # Via flag
 swiftbits vector document.pdf --provider openai --api-key sk-...
 
@@ -52,6 +80,11 @@ swiftbits vector document.pdf --provider openai
 ### Using Voyage AI Embeddings
 
 ```bash
+# Via config (recommended)
+swiftbits config set default_provider voyage
+swiftbits config set api_keys.voyage pa-...
+swiftbits vector document.pdf
+
 # Via flag
 swiftbits vector document.pdf --provider voyage --api-key pa-...
 
@@ -85,7 +118,7 @@ MCP Server (stdio) ──── query ──────────────
 
 | Module | File | Description |
 |--------|------|-------------|
-| Config | `src/swiftbits/config.py` | Path constants and helpers |
+| Config | `src/swiftbits/config.py` | Path constants, helpers, and persistent config (`~/.swiftbits/config.json`) |
 | Processor | `src/swiftbits/processor.py` | Document parsing (PDF, TXT, MD) + recursive text chunking |
 | Embeddings | `src/swiftbits/embeddings.py` | Provider abstraction (local, OpenAI, Voyage AI) |
 | Store | `src/swiftbits/store.py` | ChromaDB wrapper for vector storage |
