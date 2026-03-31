@@ -30,7 +30,12 @@ def create_server(
 
     # Set up embedding provider for query-time embedding
     provider_name = meta.get("embedding_provider", "local")
-    api_key = os.environ.get("SWIFTBITS_OPENAI_KEY")
+    API_KEY_ENV_VARS = {
+        "openai": "SWIFTBITS_OPENAI_KEY",
+        "voyage": "SWIFTBITS_VOYAGE_KEY",
+    }
+    env_var = API_KEY_ENV_VARS.get(provider_name)
+    api_key = os.environ.get(env_var) if env_var else None
 
     provider = get_provider(provider_name, api_key)
 

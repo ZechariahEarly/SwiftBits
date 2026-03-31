@@ -32,7 +32,7 @@ def cli(ctx, verbose):
 @cli.command()
 @click.argument("file_path", type=click.Path())
 @click.option("--collection", default=DEFAULT_COLLECTION, help="Collection name")
-@click.option("--provider", default="local", type=click.Choice(["local", "openai"]), help="Embedding provider")
+@click.option("--provider", default="local", type=click.Choice(["local", "openai", "voyage"]), help="Embedding provider")
 @click.option("--api-key", default=None, help="API key for remote provider")
 @click.option("--chunk-size", default=DEFAULT_CHUNK_SIZE, type=int, help="Target chunk size")
 @click.option("--chunk-overlap", default=DEFAULT_CHUNK_OVERLAP, type=int, help="Overlap between chunks")
@@ -60,6 +60,18 @@ def vector(ctx, file_path, collection, provider, api_key, chunk_size, chunk_over
         if not api_key:
             click.secho(
                 "Error: OpenAI API key required. Set SWIFTBITS_OPENAI_KEY or use --api-key",
+                fg="red",
+                err=True,
+            )
+            raise SystemExit(1)
+
+    # Resolve API key for Voyage
+    if provider == "voyage":
+        if not api_key:
+            api_key = os.environ.get("SWIFTBITS_VOYAGE_KEY")
+        if not api_key:
+            click.secho(
+                "Error: Voyage AI API key required. Set SWIFTBITS_VOYAGE_KEY or use --api-key",
                 fg="red",
                 err=True,
             )

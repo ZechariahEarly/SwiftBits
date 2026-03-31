@@ -8,6 +8,7 @@ from swiftbits.embeddings import (
     EmbeddingProvider,
     LocalEmbeddingProvider,
     OpenAIEmbeddingProvider,
+    VoyageEmbeddingProvider,
     get_provider,
 )
 
@@ -34,6 +35,19 @@ class TestGetProvider:
     def test_factory_openai_empty_key(self):
         with pytest.raises(ValueError, match="OpenAI API key required"):
             get_provider("openai", api_key="")
+
+    @patch("swiftbits.embeddings.VoyageEmbeddingProvider.__init__", return_value=None)
+    def test_factory_returns_voyage(self, mock_init):
+        provider = get_provider("voyage", api_key="pa-test")
+        assert isinstance(provider, VoyageEmbeddingProvider)
+
+    def test_factory_voyage_no_key(self):
+        with pytest.raises(ValueError, match="Voyage AI API key required"):
+            get_provider("voyage")
+
+    def test_factory_voyage_empty_key(self):
+        with pytest.raises(ValueError, match="Voyage AI API key required"):
+            get_provider("voyage", api_key="")
 
 
 class TestLocalProvider:
@@ -154,5 +168,84 @@ class TestOpenAIProvider:
 
         with patch("openai.OpenAI", return_value=mock_client):
             provider = OpenAIEmbeddingProvider(api_key="sk-test")
+            with pytest.raises(ValueError, match="Could not connect"):
+                provider.embed(["test"])
+
+
+class TestVoyageProvider:
+    def test_dimension(self):
+        with patch("voyageai.Client"):
+            provider = VoyageEmbeddingProvider(api_key="pa-test")
+            assert provider.dimension == 512
+
+    def test_name(self):
+        with patch("voyageai.Client"):
+            provider = VoyageEmbeddingProvider(api_key="pa-test")
+            assert provider.name == "voyage (voyage-3-lite)"
+
+    def test_embed_calls_api(self):
+        mock_client = MagicMock()
+        mock_result = MagicMock()
+        mock_result.embeddings = [[0.1] * 512]
+        mock_client.embed.return_value = mock_result
+
+        with patch("voyageai.Client", return_value=mock_client):
+            provider = VoyageEmbeddingProvider(api_key="pa-test")
+            result = provider.embed(["hello"])
+
+        mock_client.embed.assert_called_once_with(
+            texts=["hello"],
+            model="voyage-3-lite",
+            input_type="document",
+        )
+        assert len(result) == 1
+        assert len(result[0]) == 512
+
+    def test_embed_batches_over_128(self):
+        mock_client = MagicMock()
+        result_128 = MagicMock()
+        result_128.embeddings = [[0.1] * 512] * 128
+        result_22 = MagicMock()
+        result_22.embeddings = [[0.1] * 512] * 22
+        mock_client.embed.side_effect = [result_128, result_22]
+
+        with patch("voyageai.Client", return_value=mock_client):
+            provider = VoyageEmbeddingProvider(api_key="pa-test")
+            texts = [f"text {i}" for i in range(150)]
+            result = provider.embed(texts)
+
+        assert mock_client.embed.call_count == 2
+        assert len(result) == 150
+
+    def test_auth_error(self):
+        mock_client = MagicMock()
+        mock_error = type("AuthenticationError", (Exception,), {})
+        mock_client.embed.side_effect = mock_error()
+
+        with patch("voyageai.Client", return_value=mock_client), \
+             patch("voyageai.error.AuthenticationError", mock_error, create=True):
+            provider = VoyageEmbeddingProvider(api_key="bad-key")
+            with pytest.raises(ValueError, match="Invalid Voyage AI API key"):
+                provider.embed(["test"])
+
+    def test_rate_limit_error(self):
+        mock_client = MagicMock()
+        mock_error = type("RateLimitError", (Exception,), {})
+        mock_client.embed.side_effect = mock_error()
+
+        with patch("voyageai.Client", return_value=mock_client), \
+             patch("voyageai.error.RateLimitError", mock_error, create=True):
+            provider = VoyageEmbeddingProvider(api_key="pa-test")
+            with pytest.raises(ValueError, match="rate limit"):
+                provider.embed(["test"])
+
+    def test_connection_error(self):
+        mock_client = MagicMock()
+        mock_error = type("APIConnectionError", (Exception,), {})
+        mock_client.embed.side_effect = mock_error()
+
+        with patch("voyageai.Client", return_value=mock_client), \
+             patch("voyageai.error.APIConnectionError", mock_error, create=True):
+            provider = VoyageEmbeddingProvider(api_key="pa-test")
             with pytest.raises(ValueError, match="Could not connect"):
                 provider.embed(["test"])

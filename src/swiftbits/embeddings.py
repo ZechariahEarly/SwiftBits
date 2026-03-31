@@ -85,6 +85,51 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         return "openai (text-embedding-3-small)"
 
 
+class VoyageEmbeddingProvider(EmbeddingProvider):
+    """Uses Voyage AI's voyage-3-lite for API-based embeddings."""
+
+    def __init__(self, api_key: str):
+        import voyageai
+
+        self._client = voyageai.Client(api_key=api_key)
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        from voyageai.error import (
+            AuthenticationError,
+            APIConnectionError,
+            RateLimitError,
+        )
+
+        all_embeddings = []
+        batch_size = 128
+
+        try:
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i : i + batch_size]
+                result = self._client.embed(
+                    texts=batch,
+                    model="voyage-3-lite",
+                    input_type="document",
+                )
+                all_embeddings.extend(result.embeddings)
+        except AuthenticationError:
+            raise ValueError("Invalid Voyage AI API key")
+        except RateLimitError:
+            raise ValueError("Voyage AI rate limit hit. Try again shortly.")
+        except APIConnectionError:
+            raise ValueError("Could not connect to Voyage AI API")
+
+        return all_embeddings
+
+    @property
+    def dimension(self) -> int:
+        return 512
+
+    @property
+    def name(self) -> str:
+        return "voyage (voyage-3-lite)"
+
+
 def get_provider(
     provider: str = "local",
     api_key: str | None = None,
@@ -103,5 +148,11 @@ def get_provider(
                 "OpenAI API key required. Set SWIFTBITS_OPENAI_KEY or use --api-key"
             )
         return OpenAIEmbeddingProvider(api_key)
+    elif provider == "voyage":
+        if not api_key:
+            raise ValueError(
+                "Voyage AI API key required. Set SWIFTBITS_VOYAGE_KEY or use --api-key"
+            )
+        return VoyageEmbeddingProvider(api_key)
     else:
         raise ValueError(f"Unknown embedding provider: {provider}")
