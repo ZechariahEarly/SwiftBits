@@ -49,6 +49,17 @@ export SWIFTBITS_OPENAI_KEY=sk-...
 swiftbits vector document.pdf --provider openai
 ```
 
+### Using Voyage AI Embeddings
+
+```bash
+# Via flag
+swiftbits vector document.pdf --provider voyage --api-key pa-...
+
+# Via environment variable
+export SWIFTBITS_VOYAGE_KEY=pa-...
+swiftbits vector document.pdf --provider voyage
+```
+
 ### Claude Desktop Integration
 
 Add to your `claude_desktop_config.json`:
@@ -76,7 +87,7 @@ MCP Server (stdio) ──── query ──────────────
 |--------|------|-------------|
 | Config | `src/swiftbits/config.py` | Path constants and helpers |
 | Processor | `src/swiftbits/processor.py` | Document parsing (PDF, TXT, MD) + recursive text chunking |
-| Embeddings | `src/swiftbits/embeddings.py` | Provider abstraction (local + OpenAI) |
+| Embeddings | `src/swiftbits/embeddings.py` | Provider abstraction (local, OpenAI, Voyage AI) |
 | Store | `src/swiftbits/store.py` | ChromaDB wrapper for vector storage |
 | Server | `src/swiftbits/server.py` | MCP server with `search_documents`, `list_indexed_documents`, and `get_documents` tools |
 | CLI | `src/swiftbits/cli.py` | Click CLI orchestrating all modules |
@@ -87,7 +98,7 @@ MCP Server (stdio) ──── query ──────────────
 # Install with dev dependencies
 pip install -e ".[dev]"
 
-# Run all tests (80 tests)
+# Run all tests
 pytest
 
 # Run a single module's tests
